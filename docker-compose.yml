@@ -1,0 +1,60 @@
+version: "3.8"
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:///./health_monitor.db
+      - ASYNC_DATABASE_URL=sqlite+aiosqlite:///./health_monitor.db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    depends_on:
+      - redis
+    volumes:
+      - app-data:/app/data
+    restart: unless-stopped
+
+  celery-worker:
+    build: .
+    command: celery -A app.tasks.celery_tasks worker --loglevel=info --concurrency=4
+    environment:
+      - DATABASE_URL=sqlite:///./health_monitor.db
+      - ASYNC_DATABASE_URL=sqlite+aiosqlite:///./health_monitor.db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    depends_on:
+      - redis
+    volumes:
+      - app-data:/app/data
+    restart: unless-stopped
+
+  celery-beat:
+    build: .
+    command: celery -A app.tasks.celery_tasks beat --loglevel=info
+    environment:
+      - DATABASE_URL=sqlite:///./health_monitor.db
+      - ASYNC_DATABASE_URL=sqlite+aiosqlite:///./health_monitor.db
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
+    depends_on:
+      - redis
+    volumes:
+      - app-data:/app/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+volumes:
+  app-data:
+  redis-data:
